@@ -36,9 +36,9 @@ class DeskBookingNotification < PlaceOS::Driver
 
     # Configure any schedules here
     # https://github.com/spider-gazelle/tasker
-    # schedule.clear
-    # schedule.every(5.minutes) { poll_bookings }
-    # schedule.cron("30 7 * * *", @time_zone) { poll_bookings }
+    schedule.clear
+    schedule.every(5.minutes) { poll_bookings }
+    schedule.cron("30 7 * * *", @time_zone) { poll_bookings }
   end
 
   def on_load
