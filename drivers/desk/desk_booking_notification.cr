@@ -43,7 +43,7 @@ class DeskBookingNotification < PlaceOS::Driver
 
   def on_load
     # Some form of asset booking has occurred (such as a desk booking)
-    monitor("staff/booking/changed") { |_subscription, payload| check_booking(payload) }
+    monitor("api/staff/v1/bookings/changed") { |_subscription, payload| check_booking(payload) }
 
     on_update
   end
