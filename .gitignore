@@ -1,0 +1,10 @@
+doc
+lib
+.crystal
+.shards
+app
+*.dwarf
+repositories/*
+bin
+.DS_Store
+*.rdb
