@@ -1,11 +1,10 @@
-module Place; end
-
 require "placeos-driver/interface/mailer"
 require "./models"
 
-class Place:DeskBookingNotification < PlaceOS::Driver
-  descriptive_name "Desk Booking Approval"
-  generic_name :BookingApproval
+class DeskBookingNotification < PlaceOS::Driver
+  descriptive_name "Desk Booking Notification"
+  generic_name :DeskBookingNotification
+  description %(sends booking notification emails)
 
   default_settings({
     timezone:         "Australia/Brisbane",
