@@ -1,10 +1,16 @@
+module Place; end
+
 require "placeos-driver/interface/mailer"
 require "./models"
 
-class DeskBookingNotification < PlaceOS::Driver
-  descriptive_name "Desk Booking Notification"
-  generic_name :DeskBookingNotification
-  description %(sends booking notification emails)
+class Place::DeskBookingNotification < PlaceOS::Driver
+  # include PlaceOS::Driver::Interface::Mailer
+
+  descriptive_name "Desk Booking Approval"
+  generic_name :DeskBookingApproval
+
+  # Access another module in the system
+  accessor staff_api : StaffAPI_1
 
   default_settings({
     timezone:         "Australia/Brisbane",
@@ -13,7 +19,7 @@ class DeskBookingNotification < PlaceOS::Driver
     time_format:      "%l:%M%p",
     date_format:      "%A, %-d %B",
     booking_type:     "desk",
-    buildings:        "",
+    buildings:        ["zone-123", "zone-456"],
   })
 
   # Ensures these variables are not nilable
@@ -23,6 +29,18 @@ class DeskBookingNotification < PlaceOS::Driver
   @date_format : String = "%A, %-d %B"
   @booking_type : String = "desk"
   @buildings : Array(String) = [] of String
+
+  # Get a reference to the module to be used to send emails
+  def mailer
+    system.implementing(Interface::Mailer)
+  end
+
+  def on_load
+    # Some form of asset booking has occurred (such as a desk booking)
+    monitor("staff/bookings/changed") { |_subscription, payload| check_booking(payload) }
+
+    on_update
+  end
 
   def on_update
     # Update the instance variables based on the settings
@@ -41,22 +59,7 @@ class DeskBookingNotification < PlaceOS::Driver
     schedule.cron("30 7 * * *", @time_zone) { poll_bookings }
   end
 
-  def on_load
-    # Some form of asset booking has occurred (such as a desk booking)
-    monitor("api/staff/v1/bookings/changed") { |_subscription, payload| check_booking(payload) }
-
-    on_update
-  end
-
-  # Get a reference to the module to be used to send emails
-  def mailer
-    system.implementing(Interface::Mailer)
-  end
-
-  # Access another module in the system
-  accessor staff_api : StaffAPI_1
-
-  protected def check_booking(payload : String)
+  def check_booking(payload : String)
     logger.debug { "received booking event payload: #{payload}" }
     booking_details = Booking.from_json payload
     process_booking(booking_details)
@@ -126,6 +129,7 @@ class DeskBookingNotification < PlaceOS::Driver
     location = Time::Location.load(timezone)
 
     # Set the date and time forme like: Tue Apr 15 10:26:19 2021
+    # https://crystal-lang.org/api/0.35.1/Time/Format.html
     starting = Time.unix(booking_details.booking_start).in(location)
     ending = Time.unix(booking_details.booking_end).in(location)
 
@@ -165,6 +169,18 @@ class DeskBookingNotification < PlaceOS::Driver
 
     # Send email logic depending on the booking action step
     case booking_details.action
+      when "create", "changed"
+        # Skip sending email if already sent
+        next if booking_details.process_state == "notification_sent"
+
+        mailer.send_template(
+          to: booking_details.user_email,
+          template: {"bookings", "booking_notification"},
+          args: args
+        )
+
+        # If there are multiple states, update it
+        staff_api.booking_state(booking_details.id, "notification_sent").get
       when "approved"
         mailer.send_template(
           to: booking_details.user_email,
@@ -173,6 +189,32 @@ class DeskBookingNotification < PlaceOS::Driver
         )
 
         staff_api.booking_state(booking_details.id, "approval_sent").get
+      when "rejected", "checked_in"
+        mailer.send_template(
+          to: booking_details.user_email,
+          template: {"bookings", booking_details.action},
+          args: args
+        )
+      when "cancelled"
+        # Check who cancelled the booking, user or approver
+        third_party = booking_details.approver_email && booking_details.approver_email != booking_details.user_email.downcase
+
+        # Select a different template depending on who cancelled
+        # the booking
+        mailer.send_template(
+          to: booking_details.user_email,
+          template: {"bookings", third_party ? "cancelled_by" : "cancelled"},
+          args: args
+        )
+
+        # If manager notification is set, send an email as well
+        if manager_email = get_manager(user_email).try(&.at(0))
+          mailer.send_template(
+            to: manager_email,
+            template: {"bookings", "manager_notify_cancelled"},
+            args: args
+          )
+        end
     end
 
     # nice to see some status in backoffice
@@ -206,4 +248,16 @@ class DeskBookingNotification < PlaceOS::Driver
     logger.warn(exception: error) { "error obtaining zone details for #{zone_id}" }
     nil
   end
+
+  @[Security(Level::Support)]
+  def get_manager(staff_email : String)
+    # The Calendar driver is hooked up to MS Graph API for example
+    # could have used an accessor here like `staff_api`, that's optional
+    manager = system[:StaffAPI_1].get_user_manager(staff_email).get
+    {(manager["email"]? || manager["username"]).as_s, manager["name"].as_s}
+  rescue error
+    logger.warn(exception: error) { "failed to obtain manager of #{staff_email}" }
+    {nil, nil}
+  end
+
 end

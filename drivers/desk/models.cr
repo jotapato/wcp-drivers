@@ -1,7 +1,7 @@
 require "json"
 
 # Desk Data Models
-module Desk
+module Place
   class Booking
     include JSON::Serializable
 
@@ -14,7 +14,7 @@ module Desk
     property booking_end : Int64
     property timezone : String?
 
-    # events use resource_id instead of asset_id
+    # Events use resource_id instead of asset_id
     property asset_id : String?
     property resource_id : String?
 
