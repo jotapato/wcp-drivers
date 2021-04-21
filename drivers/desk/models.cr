@@ -1,7 +1,7 @@
 require "json"
 
 # Desk Data Models
-module Place
+module Desk
   class Booking
     include JSON::Serializable
 
@@ -40,11 +40,8 @@ module Place
     property booked_by_name : String
     property booked_by_email : String
 
-    property checked_in : Bool?
     property title : String?
     property description : String?
-
-    property extension_data : Hash(String, JSON::Any)
 
     def in_progress?
       now = Time.utc.to_unix
