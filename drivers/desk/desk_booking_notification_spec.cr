@@ -15,7 +15,7 @@ class StaffAPI < DriverSpecs::MockDriver
     approved : Bool? = nil,
     rejected : Bool? = nil
   )
-    logger.info { "Querying desk bookings!" }
+    logger.debug { "Querying desk bookings!" }
 
     now = Time.local
     start = now.at_beginning_of_day.to_unix
@@ -31,8 +31,6 @@ class StaffAPI < DriverSpecs::MockDriver
       user_email:    "jane.doe@test.com",
       user_name:     "Jane Doe",
       zones:         ["zone-123"],
-      checked_in:    false,
-      rejected:      false,
     },
     {
       id:            2,
@@ -44,13 +42,11 @@ class StaffAPI < DriverSpecs::MockDriver
       user_email:    "zee.doo@test.com",
       user_name:     "Zee Doo",
       zones:         ["zone-456"],
-      checked_in:    false,
-      rejected:      false,
     }]
   end
 
   def zone(zone_id : String)
-    logger.info { "requesting zone: #{zone_id}" }
+    logger.debug { "Requesting zone: #{zone_id}" }
     if zone_id == "zone-123"
       {
         "id"   => zone_id,
@@ -67,7 +63,7 @@ class StaffAPI < DriverSpecs::MockDriver
   end
 
   def booking_state(booking_id : String | Int64, state : String)
-    logger.info { "updating booking id \"#{booking_id}\" state to: #{state}" }
+    logger.debug { "Updating booking id \"#{booking_id}\" state to: #{state}" }
     true
   end
 end
@@ -87,24 +83,23 @@ class SMTP < DriverSpecs::MockDriver
     bcc : String | Array(String) = [] of String,
     from : String | Array(String) | Nil = nil
   )
-    logger.info { "email sent" }
+    logger.debug { "Email sent!" }
+    self[:to_email] = to
     self[:message] = message_html
   end
 
-  def send_template(
-    to : String | Array(String),
-    template : Tuple(String, String),
-    args : TemplateItems,
-    resource_attachments : Array(ResourceAttachment) = [] of ResourceAttachment,
-    attachments : Array(Attachment) = [] of Attachment,
-    cc : String | Array(String) = [] of String,
-    bcc : String | Array(String) = [] of String,
-    from : String | Array(String) | Nil = nil
-  )
-    logger.info { "sending email template to: #{to}" }
-    self[:email_template] = template
-    self[:to_email] = to
-  end
+  @templates = {
+    "bookings" => {
+      "booking_notification" => {
+        "subject" => "Desk booking: Dummy subject text",
+        "html" => "Desk booking dummy body text content."
+      },
+      "booking_details" => {
+        "subject" => "Desk details: Dummy subject text",
+        "html" => "Desk details dummy body text content."
+      }
+    }
+  }
 end
 
 DriverSpecs.mock_driver "Desk::DeskBookingNotification" do
@@ -133,13 +128,14 @@ DriverSpecs.mock_driver "Desk::DeskBookingNotification" do
     booked_by_email: "jhon.doe@test.com",
   }
 
+  # alias Templates = Hash(String, Hash(String, Hash(String, String)))
+  # @templates : Templates = Templates.new
+
+
   # Execute commandand wait until finish so then the system can check the result
   exec(:check_booking, payload.to_json).get
   # Expect the email message text to be the correct one
-  system(:Mailer_1)[:message] = "message_html"
-  system(:Mailer_1)[:message].should eq("message_html")
-  # Expect the email template from the payload action: changed
-  system(:Mailer_1)[:email_template].should eq(["bookings", "booking_notification"])
+  system(:Mailer_1)[:message].should eq("Desk booking dummy body text content.")
   # Expect to send the email to the user, instead of the booked by user
   system(:Mailer_1)[:to_email].should eq(payload["user_email"])
 end

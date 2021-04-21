@@ -34,14 +34,8 @@ module Desk
     property process_state : String?
     property last_changed : Int64?
 
-    property approver_name : String?
-    property approver_email : String?
-
     property booked_by_name : String
     property booked_by_email : String
-
-    property title : String?
-    property description : String?
 
     def in_progress?
       now = Time.utc.to_unix

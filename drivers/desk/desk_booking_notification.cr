@@ -149,14 +149,10 @@ class Desk::DeskBookingNotification < PlaceOS::Driver
       user_id:    booking_details.user_id,
       user_email: booking_details.user_email,
       user_name:  booking_details.user_name,
-      reason:     booking_details.title,
 
       level_zone:    booking_details.zones.reject { |z| z == building_zone }.first?,
       building_zone: building_zone,
       building_name: building_name,
-
-      approver_name:  booking_details.approver_name,
-      approver_email: booking_details.approver_email,
 
       booked_by_name:  booking_details.booked_by_name,
       booked_by_email: booking_details.booked_by_email,
